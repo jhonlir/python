@@ -17,7 +17,9 @@ async def chat(message: Message):
     
     # Reemplazar '_m_e_n_s_a_j_e_' con el contenido de message.message
     completed_message = message_template.replace('_m_e_n_s_a_j_e_', message.message)
+
     
+
     client = ChatClient()
     
     # Establecer conversation_id si está presente en el mensaje

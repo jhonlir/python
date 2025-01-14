@@ -20,6 +20,7 @@ class ChatClient:
     def send_message(self, mensaje):
         headers = { "Authorization": f"Bearer {self.token}", "Content-Type": "application/json" }
         datax = { }        
+        print(f"Contenido del mensaje: {mensaje}")
         if not self.conversation_id:
            # Realizar la primera petición para obtener el conversation_id        
            response = requests.post(self.session_url, headers=headers, json=datax)            
