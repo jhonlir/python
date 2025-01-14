@@ -4,7 +4,10 @@ from appd2chat.models.message import Message
 from appd2chat.controllers.chat_client import ChatClient
 from appd2chat.controllers.chat_client_facebook import FacebookClient # Import FacebookClient
 import os
+import re
 import json
+import mysql.connector
+
 
 router = APIRouter()
 
@@ -27,12 +30,32 @@ async def chat(message: Message):
         client.set_conversation_id(message.conversation_id)
     
     result = client.send_message(completed_message)
-
+    msg = ' ';
     if result:
         message_content = result['important_response']   
+        datos = extract_option_sql(message_content);
+        
+        if datos:
+            option = datos['opcion']
+            if option == '1':
+                print(f"Uno: {datos['sql']}")
+                msg = process_sql(datos['sql'])
+                print(msg)
+            elif option == '2':
+                print("Dos")
+            elif option == '3':
+                print("Tres")
+            elif option == '4':
+                print("Cuatro")
+            else:
+                print(f"Opción no reconocida: {option}")
+        else:
+            print("No se pudo extraer la opción y la sentencia SQL.")
+    
+    
         response = {
             "code": 200,
-            "message": message_content,  # Usar tmp_response.rta_alterna como valor para la propiedad message
+            "message": msg,  # Usar tmp_response.rta_alterna como valor para la propiedad message
             "conversation_id": result['conversation_id']
         }
     else:
@@ -53,3 +76,45 @@ def get_facebook_video_embed(video_id: str, client: FacebookClient = Depends(Fac
         raise e  # Re-raise HTTPExceptions for proper FastAPI error handling
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
+        
+def extract_option_sql(input_string):
+    match = re.match(r"\[opcion:(\d+)\]\[sql:(.*)\]", input_string)  # Expresión regular corregida
+    if match:
+        option = match.group(1)
+        sql = match.group(2)
+        return {"opcion": option, "sql": sql}
+    else:
+        return None        
+        
+        
+import mysql.connector
+
+def process_sql(sql_query):
+    new_sql = sql_query.replace('*', "CONCAT_WS(', ', CONCAT(nombre,' ', apellidos), numero_celular) AS 'Esta es la información que puedo proveerte: '", 1)
+    try:
+        mydb = mysql.connector.connect(
+            host="157.173.126.140",
+            user="user_info_distrito_2",
+            password="info*distrito2*db",
+            database="informacion_distrito_2_db",
+            port= 3306
+        )
+        cursor = mydb.cursor(dictionary=True)
+        cursor.execute(new_sql)
+        results = cursor.fetchall()
+
+        output_list = []
+        for row in results:
+            row_string = ""
+            for key, value in row.items():
+                row_string += f"{key}: {value}, "
+            output_list.append(row_string.strip(", "))
+        return output_list
+    except mysql.connector.Error as err:
+        return f"Error al conectar a la base de datos: {err}"
+    except Exception as e:
+        return f"Ocurrió un error inesperado: {e}"
+    finally:
+        if 'mydb' in locals() and mydb.is_connected():
+            cursor.close()
+            mydb.close()        

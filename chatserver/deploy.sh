@@ -10,7 +10,8 @@ sudo docker stop chatserver-container || true
 sudo docker rm chatserver-container || true
 
 # Ejecutar un nuevo contenedor
-sudo docker run -d --name chatserver-container -p 8000:8000 chatserver || exit 1
+sudo docker run  -d --name chatserver-container -p 8000:8000 chatserver || exit 1
+
 
 # Verificar que el contenedor esté en ejecución
 sudo docker ps || exit 1
