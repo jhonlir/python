@@ -9,7 +9,7 @@ class ChatClient:
         
         self.session_url = 'https://app.khoj.dev/api/chat/sessions'
         self.chat_url = 'https://app.khoj.dev/api/chat?client=web'
-        self.token = 'kk-tmdyi-ngeX2BSpQ4hYG7witjWIPYfh5BPzfK7nJS6eM';          
+        self.token = 'kk-n99zJSoqgSwyTrckYEhtY8D-LQnKO-TFfGbx93suHRs';          
         
         
         self.conversation_id = None  # Agregar atributo conversation_id

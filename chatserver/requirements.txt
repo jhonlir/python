@@ -3,3 +3,6 @@ uvicorn
 gunicorn
 requests
 mysql-connector-python
+websockets
+wsproto
+

@@ -37,8 +37,7 @@ async def chat(message: Message):
         
         if datos:
             option = datos['opcion']
-            if option == '1':
-                print(f"Uno: {datos['sql']}")
+            if option == '1':                
                 msg = process_sql(datos['sql'])
                 print(msg)
             elif option == '2':
@@ -63,8 +62,9 @@ async def chat(message: Message):
             "code": 500,
             "message": "Error processing the request"
         }
-
-    return JSONResponse(content=response)
+    # Forzar la conversión a UTF-8 antes de devolver la respuesta 
+    #return JSONResponse(content=json.dumps(response, ensure_ascii=False).encode('utf-8'), headers={"Content-Type": "application/json; charset=utf-8"})
+    return JSONResponse(content=response, headers={"Content-Type": "application/json; charset=utf-8"})
     
     
 @router.post("/facebook/video")
@@ -90,8 +90,11 @@ def extract_option_sql(input_string):
 import mysql.connector
 
 def process_sql(sql_query):
-    new_sql = sql_query.replace('*', "CONCAT_WS(', ', CONCAT(nombre,' ', apellidos), numero_celular) AS 'Esta es la información que puedo proveerte: '", 1)
+    new_sql = sql_query.replace('*', "CONCAT_WS(', ', CONCAT(nombre,' ', apellidos), numero_celular) AS '-> '", 1)
     try:
+        # Usando expresiones regulares para reemplazar los espacios múltiples dentro de los signos de porcentaje por %
+        new_sql = re.sub(r'%(.*?)%', lambda match: '%' + re.sub(r'\s+', '%', match.group(1).strip()) + '%', new_sql)
+        print(f"Uno: {new_sql}")
         mydb = mysql.connector.connect(
             host="157.173.126.140",
             user="user_info_distrito_2",
@@ -103,11 +106,11 @@ def process_sql(sql_query):
         cursor.execute(new_sql)
         results = cursor.fetchall()
 
-        output_list = []
+        output_list = ['Ésta es la información que puedo proveerte: ']
         for row in results:
             row_string = ""
             for key, value in row.items():
-                row_string += f"{key}: {value}, "
+                row_string += f"{key} {value}, "
             output_list.append(row_string.strip(", "))
         return output_list
     except mysql.connector.Error as err:
