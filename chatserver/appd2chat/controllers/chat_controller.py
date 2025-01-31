@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from appd2chat.models.message import Message
 from appd2chat.controllers.chat_client import ChatClient
@@ -7,6 +7,7 @@ import os
 import re
 import json
 import mysql.connector
+from datetime import datetime, timedelta  # Importar timedelta
 
 
 router = APIRouter()
@@ -121,3 +122,157 @@ def process_sql(sql_query):
         if 'mydb' in locals() and mydb.is_connected():
             cursor.close()
             mydb.close()        
+    
+@router.post("/eventos")
+def get_eventos(mes: int = Query(..., ge=1, le=12)):
+    try:
+        mydb = mysql.connector.connect(
+            host="157.173.126.140",
+            user="user_info_distrito_2",
+            password="info*distrito2*db",
+            database="informacion_distrito_2_db",
+            port=3306
+        )
+        cursor = mydb.cursor(dictionary=True)
+        
+        fecha_inicio = datetime.strptime(f"2025-{mes:02d}-01", '%Y-%m-%d')
+        if mes == 12:
+            fecha_fin = datetime.strptime("2026-01-01", '%Y-%m-%d')
+        else:
+            fecha_fin = datetime.strptime(f"2025-{mes + 1:02d}-01", '%Y-%m-%d')
+        
+        query = """
+        SELECT * FROM eventos
+        WHERE fecha >= %s AND fecha < %s
+        """
+        cursor.execute(query, (fecha_inicio, fecha_fin))
+        results = cursor.fetchall()
+
+        eventos_list = []
+        for evento in results:
+            eventos_list.append({
+                'eventId': evento['id'],
+                'eventDate': evento['fecha'].strftime('%Y-%m-%d'),
+                'eventTitle': evento['evento'],
+                'eventComittee': evento['comite'],              
+                'eventType': evento['tipo_evento']
+            })
+
+        return JSONResponse(content=eventos_list)
+    
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Error al conectar a la base de datos: {err}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ocurrió un error inesperado: {e}")
+    finally:
+        if 'mydb' in locals() and mydb.is_connected():
+            cursor.close()
+            mydb.close()
+            
+@router.post("/congregaciones")
+def get_congregaciones():
+    try:
+        mydb = mysql.connector.connect(
+            host="157.173.126.140",
+            user="user_info_distrito_2",
+            password="info*distrito2*db",
+            database="informacion_distrito_2_db",
+            port=3306
+        )
+        cursor = mydb.cursor(dictionary=True)
+
+        query = "SELECT codigo, nombre FROM congregaciones" # Select only necessary columns
+        cursor.execute(query)
+        results = cursor.fetchall()
+
+        congregaciones_list = [{'id': c['codigo'], 'nombre': c['nombre']} for c in results] # List comprehension for conciseness
+
+        return JSONResponse(content=congregaciones_list)
+
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Error de base de datos: {err}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error inesperado: {e}")
+    finally:
+        if mydb and mydb.is_connected():
+            cursor.close()
+            mydb.close()            
+
+
+@router.post("/saverequest")
+async def save_request(request: Request):
+    try:
+        data = json.loads(await request.body())
+        mydb = mysql.connector.connect(
+            host="157.173.126.140",
+            user="user_info_distrito_2",
+            password="info*distrito2*db",
+            database="informacion_distrito_2_db",
+            port=3306
+        )
+        cursor = mydb.cursor()
+
+        query = "INSERT INTO portfolio_requests (services, congregations, startDate, endDate, budget, observations, userId, userChurch) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+        values = (
+            data.get('services'),
+            data.get('congregations'),
+            data.get('startDate'),
+            data.get('endDate'),
+            data.get('budget'),
+            data.get('observations'),
+            data.get('userId'),
+            data.get('userChurch')
+        )
+        cursor.execute(query, values)
+        mydb.commit()
+        return JSONResponse(content={"message": "Request saved successfully"})
+    except mysql.connector.Error as err:
+        mydb.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON request body")
+    except KeyError as e:
+        raise HTTPException(status_code=400, detail=f"Missing required field: {e}")
+    except Exception as e:
+        mydb.rollback()
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
+    finally:
+        if mydb.is_connected():
+            cursor.close()
+            mydb.close()
+
+@router.post("/checkrequest")
+async def check_request(request: Request):
+    try:
+        data = json.loads(await request.body())
+        user_church = data.get('userChurch')
+        service = data.get('service')
+        current_date = data.get('currentDate')
+
+        mydb = mysql.connector.connect(
+            host="157.173.126.140",
+            user="user_info_distrito_2",
+            password="info*distrito2*db",
+            database="informacion_distrito_2_db",
+            port=3306
+        )
+        cursor = mydb.cursor()
+
+        query = "SELECT COUNT(*) FROM portfolio_requests WHERE userChurch = %s AND services = %s AND endDate > %s"
+        cursor.execute(query, (user_church, service, current_date))
+        count = cursor.fetchone()[0]
+
+        exists = count > 0
+        return JSONResponse(content={"exists": exists})
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON request body")
+    except KeyError as e:
+        raise HTTPException(status_code=400, detail=f"Missing required field: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
+    finally:
+        if mydb.is_connected():
+            cursor.close()
+            mydb.close()
