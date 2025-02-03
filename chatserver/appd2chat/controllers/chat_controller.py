@@ -276,3 +276,54 @@ async def check_request(request: Request):
         if mydb.is_connected():
             cursor.close()
             mydb.close()
+            
+
+
+@router.post("/getservicesrequest")
+async def get_services_request(request: Request):
+    try:
+        body = await request.json()
+        userId = body.get('userId')
+
+        if userId is None:
+            raise HTTPException(status_code=400, detail="Missing userId in request body")
+
+        mydb = mysql.connector.connect(
+            host="157.173.126.140",
+            user="user_info_distrito_2",
+            password="info*distrito2*db",
+            database="informacion_distrito_2_db",
+            port=3306
+        )
+        cursor = mydb.cursor(dictionary=True)
+
+        query = """
+        SELECT id, services, congregations, startDate, endDate, budget, observations, userId, userChurch, leadership_approval, pastor_approval
+        FROM portfolio_requests
+        WHERE userId = %s
+        """
+        cursor.execute(query, (userId,))
+        results = cursor.fetchall()
+
+        # Convertir los resultados a una lista de diccionarios
+        services_request_list = []
+        for r in results:
+            # Convertir las fechas a cadenas
+            r['startDate'] = r['startDate'].isoformat() if r['startDate'] else None
+            r['endDate'] = r['endDate'].isoformat() if r['endDate'] else None
+            
+            # Convertir budget de Decimal a float
+            r['budget'] = float(r['budget']) if r['budget'] is not None else None
+            
+            services_request_list.append(dict(r))
+
+        return JSONResponse(content=services_request_list)
+
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Error de base de datos: {err}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error inesperado: {e}")
+    finally:
+        if mydb and mydb.is_connected():
+            cursor.close()
+            mydb.close()
